@@ -1983,6 +1983,9 @@ export abstract class IgxGridBaseComponent extends DisplayDensityBase implements
         this.cdr.markForCheck();
     }
 
+    @Input()
+    cellSelectable = 'multi';
+
     /**
      * @hidden
      */

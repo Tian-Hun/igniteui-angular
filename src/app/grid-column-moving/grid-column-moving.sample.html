@@ -11,6 +11,7 @@
             <igx-grid
                 #grid1
                 [data]="data"
+                [cellSelectable]="cSel"
                 [displayDensity]="density"
                 [showToolbar]="true" [columnHiding]="true"
                 [allowFiltering]="true"
@@ -18,6 +19,8 @@
                 (onColumnMoving)="onColumnMoving($event)"
                 (onColumnMovingEnd)="onColumnMovingEnd($event)"
                 [rowSelectable]="true"
+                primaryKey='ID'
+                rowEditable="true"
                 [filterMode]="'excelStyleFilter'"
                 [paging]="false"
                 [width]="'900px'"
@@ -41,11 +44,16 @@
             <div class="sample-buttons">
                 <button igxButton="raised" (click)="toggleColumn('ContactTitle')">Pin/Unpin 'ContactTitle'</button>
                 <button igxButton (click)="grid1.selectRange({rowStart: 0, rowEnd: 10, columnStart: 'CompanyName', columnEnd: 'Region'})">Select 💯 cells</button>
-                <button igxButton="raised" (click)="grid1.clearCellSelection()">Clear Selection</button>
+                <button igxButton="raised" (click)="grid1.clearCellSelection(); grid1.selectRows([], true)">Clear Selection</button>
                 <button igxButton="raised" (click)="grid1.getSelectedData()">Get Selected Data</button>
                 <button igxButton="raised" (click)="grid1.getSelectedRanges()">Get Selected Ranges</button>
-                <button (click)="grid1.crudService.commit()">Update cell in edit mode</button>
             </div>
+            <igx-select [(ngModel)]="cSel" (onSelection)="grid1.clearCellSelection()">
+                <label igxLabel>Cell selection type</label>
+                <igx-select-item *ngFor="let selection of ['none', 'single', 'multi']" [value]="selection">
+                    {{ selection | titlecase }}
+                </igx-select-item>
+            </igx-select>
         </div>
     </div>
 </div>

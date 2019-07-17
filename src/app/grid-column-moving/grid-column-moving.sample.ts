@@ -22,6 +22,8 @@ export class GridColumnMovingSampleComponent implements OnInit {
         console.log(event);
     }
 
+    cSel = 'multi';
+
     public ngOnInit(): void {
         this.displayDensities = [
             { label: 'comfortable', selected: this.density === 'comfortable', togglable: true },

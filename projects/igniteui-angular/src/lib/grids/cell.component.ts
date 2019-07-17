@@ -23,6 +23,7 @@ import { State } from '../services/index';
 import { IgxGridBaseComponent, IGridEditEventArgs, IGridDataBindable } from './grid-base.component';
 import { IgxGridSelectionService, ISelectionNode, IgxGridCRUDService } from '../core/grid-selection';
 import { DeprecateProperty } from '../core/deprecateDecorators';
+import { noop } from 'rxjs';
 
 /**
  * Providing reference to `IgxGridCellComponent`:
@@ -439,6 +440,9 @@ export class IgxGridCellComponent implements OnInit, OnChanges, OnDestroy {
         return false;
     }
 
+    @Input()
+    selectionType: string;
+
     /**
      * Sets the current edit value while a cell is in edit mode.
      * Only for cell editing mode.
@@ -533,17 +537,33 @@ export class IgxGridCellComponent implements OnInit, OnChanges, OnDestroy {
         protected zone: NgZone) { }
 
 
+    addPointerEvents() {
+        this.zone.runOutsideAngular(() => {
+            this.nativeElement.addEventListener('pointerdown', this.pointerdown);
+            this.nativeElement.addEventListener('pointerenter', this.pointerenter);
+            this.nativeElement.addEventListener('pointerup', this.pointerup);
+        });
+    }
+
+    removePointerEvents() {
+        this.zone.runOutsideAngular(() => {
+            this.nativeElement.removeEventListener('pointerdown', this.pointerdown);
+            this.nativeElement.removeEventListener('pointerenter', this.pointerenter);
+            this.nativeElement.removeEventListener('pointerup', this.pointerup);
+        });
+    }
+
     /**
      * @hidden
      * @internal
      */
     ngOnInit() {
-        this.zone.runOutsideAngular(() => {
-            this.nativeElement.addEventListener('pointerdown', this.pointerdown);
-            this.nativeElement.addEventListener('pointerenter', this.pointerenter);
-            this.nativeElement.addEventListener('pointerup', this.pointerup);
+        // if (this.isMultiCellSelection) {
+            this.addPointerEvents();
+        // }
 
-            // IE 11 workarounds
+        // IE 11 workarounds
+        this.zone.runOutsideAngular(() => {
             if (isIE()) {
                 this.compositionStartHandler = () => this.isInCompositionMode = true;
                 this.compositionEndHandler = () => this.isInCompositionMode = false;
@@ -554,16 +574,28 @@ export class IgxGridCellComponent implements OnInit, OnChanges, OnDestroy {
         });
     }
 
+    get isMultiCellSelection() {
+        return this.selectionType === 'multi';
+    }
+
+    get isSingleCellSelection() {
+        return this.selectionType === 'single';
+    }
+
+    get isNoneCellSelection() {
+        return this.selectionType === 'none';
+    }
+
     /**
      * @hidden
      * @internal
      */
     ngOnDestroy() {
-        this.zone.runOutsideAngular(() => {
-            this.nativeElement.removeEventListener('pointerdown', this.pointerdown);
-            this.nativeElement.removeEventListener('pointerenter', this.pointerenter);
-            this.nativeElement.removeEventListener('pointerup', this.pointerup);
+        // if (this.isMultiCellSelection) {
+            this.removePointerEvents();
+        // }
 
+        this.zone.runOutsideAngular(() => {
             if (isIE()) {
                 this.nativeElement.removeEventListener('compositionstart', this.compositionStartHandler);
                 this.nativeElement.removeEventListener('compositionend', this.compositionEndHandler);
@@ -624,6 +656,15 @@ export class IgxGridCellComponent implements OnInit, OnChanges, OnDestroy {
                 this.highlight.lastSearchInfo.exactMatch = this.grid.lastSearchInfo.exactMatch;
             }
         }
+        // if (changes.selectionType && !changes.selectionType.firstChange) {
+            // const {previousValue, currentValue} = {...changes.selectionType};
+            // currentValue === 'multi' ? this.addPointerEvents() : previousValue === 'multi' ? this.removePointerEvents() : noop();
+            // if (currentValue === 'multi') {
+            //     this.addPointerEvents();
+            // } else if (previousValue === 'multi') {
+            //     this.removePointerEvents();
+            // }
+        // }
     }
 
     /**
@@ -681,7 +722,9 @@ export class IgxGridCellComponent implements OnInit, OnChanges, OnDestroy {
             this.selectionService.primaryButton = false;
             return;
         }
-        this.selectionService.pointerDown(this.selectionNode, event.shiftKey, event.ctrlKey);
+        if (this.isMultiCellSelection) {
+            this.selectionService.pointerDown(this.selectionNode, event.shiftKey, event.ctrlKey);
+        }
     }
 
     /**
@@ -690,6 +733,7 @@ export class IgxGridCellComponent implements OnInit, OnChanges, OnDestroy {
      * @internal
      */
     pointerenter = (event: PointerEvent) => {
+        if (!this.isMultiCellSelection) { return; }
         const dragMode = this.selectionService.pointerEnter(this.selectionNode, event);
         if (dragMode) {
             this.grid.cdr.detectChanges();
@@ -705,7 +749,7 @@ export class IgxGridCellComponent implements OnInit, OnChanges, OnDestroy {
             this.grid.navigation.setStartNavigationCell(this.colStart, this.rowStart, null);
         }
         if (!isLeftClick(event)) { return; }
-        if (this.selectionService.pointerUp(this.selectionNode, this.grid.onRangeSelection)) {
+        if (this.isMultiCellSelection && this.selectionService.pointerUp(this.selectionNode, this.grid.onRangeSelection)) {
             this.grid.cdr.detectChanges();
         }
         this._updateCRUDStatus();
@@ -761,6 +805,32 @@ export class IgxGridCellComponent implements OnInit, OnChanges, OnDestroy {
             return;
         }
 
+        if (this.isNoneCellSelection) {
+            if (this.selectionService.primaryButton) {
+                this._updateCRUDStatus();
+            } else {
+                if (this.crudService.inEditMode && !this.editMode) {
+                    this.gridAPI.submit_value();
+                }
+            }
+            this.focused = true;
+            return;
+        }
+        // else if (this.selectionType === 'row') {
+        //     this.grid.selectRows([this.row.rowID], true);
+        //     this.focused = true;
+        //     if (this.selectionService.primaryButton) {
+        //         this._updateCRUDStatus();
+        //         // this.selectionService.activeElement = this.selectionNode;
+        //     } else {
+        //         // this.selectionService.activeElement = null;
+        //         if (this.crudService.inEditMode && !this.editMode) {
+        //             this.gridAPI.submit_value();
+        //         }
+        //     }
+        //     return;
+        // }
+
         const node = this.selectionNode;
         const mrl = this.grid.hasColumnLayouts;
         this.focused = true;
@@ -781,7 +851,9 @@ export class IgxGridCellComponent implements OnInit, OnChanges, OnDestroy {
         }
 
         this.selectionService.primaryButton = true;
-        this.selectionService.keyboardStateOnFocus(node, this.grid.onRangeSelection, this.nativeElement);
+        if (this.isMultiCellSelection) {
+            this.selectionService.keyboardStateOnFocus(node, this.grid.onRangeSelection, this.nativeElement);
+        }
     }
 
     /**
